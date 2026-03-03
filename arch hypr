@@ -1,0 +1,342 @@
+#!/bin/bash
+
+# ==============================================================================
+# SCRIPT DE CONFIGURACIÓN DE HYPRLAND PARA ARCH LINUX
+# ==============================================================================
+
+# Colores para los mensajes de la terminal
+GREEN="$(tput setaf 2)"
+BLUE="$(tput setaf 4)"
+YELLOW="$(tput setaf 3)"
+RESET="$(tput sgr0)"
+
+echo "${BLUE}====================================================${RESET}"
+echo "${BLUE}  Iniciando la configuración del entorno Hyprland...${RESET}"
+echo "${BLUE}====================================================${RESET}"
+
+# 1. Instalar paquetes necesarios (requiere sudo)
+echo "${YELLOW}Instalando paquetes base desde los repositorios oficiales...${RESET}"
+sudo pacman -S --needed hyprland waybar kitty wofi dunst hyprpaper thunar ttf-jetbrains-mono-nerd polkit-kde-agent network-manager-applet
+
+# 2. Crear estructura de directorios
+echo "${YELLOW}Creando directorios en ~/.config...${RESET}"
+mkdir -p ~/.config/{hypr,waybar,kitty,wofi,dunst}
+
+# ==============================================================================
+# 3. CONFIGURACIÓN DE HYPRLAND
+# ==============================================================================
+echo "${YELLOW}Generando ~/.config/hypr/hyprland.conf...${RESET}"
+cat << 'EOF' > ~/.config/hypr/hyprland.conf
+# --- MONITORES ---
+monitor=,preferred,auto,auto
+
+# --- PROGRAMAS POR DEFECTO ---
+$terminal = kitty
+$fileManager = thunar
+$menu = wofi --show drun
+
+# --- AUTOSTART ---
+exec-once = waybar
+exec-once = hyprpaper
+exec-once = dunst
+exec-once = nm-applet --indicator
+exec-once = /usr/lib/polkit-kde-authentication-agent-1
+
+# --- VARIABLES DE ENTORNO ---
+env = XCURSOR_SIZE,24
+env = QT_QPA_PLATFORMTHEME,qt5ct # Cambiar a qt6ct si es necesario
+
+# --- ASPECTO GENERAL ---
+general {
+    gaps_in = 5
+    gaps_out = 10
+    border_size = 2
+    col.active_border = rgba(cba6f7ff) rgba(89b4faff) 45deg
+    col.inactive_border = rgba(313244aa)
+    layout = dwindle
+}
+
+# --- DECORACIÓN Y EFECTOS ---
+decoration {
+    rounding = 10
+    blur {
+        enabled = true
+        size = 3
+        passes = 2
+    }
+    drop_shadow = yes
+    shadow_range = 4
+    shadow_render_power = 3
+    col.shadow = rgba(1a1a1aee)
+}
+
+# --- ANIMACIONES ---
+animations {
+    enabled = yes
+    bezier = myBezier, 0.05, 0.9, 0.1, 1.05
+    animation = windows, 1, 7, myBezier
+    animation = windowsOut, 1, 7, default, popin 80%
+    animation = border, 1, 10, default
+    animation = fade, 1, 7, default
+    animation = workspaces, 1, 6, default
+}
+
+# --- COMPORTAMIENTO ---
+dwindle {
+    pseudotile = yes
+    preserve_split = yes
+}
+master {
+    new_is_master = true
+}
+gestures {
+    workspace_swipe = on
+}
+
+# --- ATAJOS DE TECLADO (KEYBINDS) ---
+$mainMod = SUPER
+
+bind = $mainMod, Return, exec, $terminal
+bind = $mainMod, Q, killactive, 
+bind = $mainMod SHIFT, M, exit, 
+bind = $mainMod, E, exec, $fileManager
+bind = $mainMod, V, togglefloating, 
+bind = $mainMod, Space, exec, $menu
+bind = $mainMod, P, pseudo, # dwindle
+bind = $mainMod, J, togglesplit, # dwindle
+bind = $mainMod, F, fullscreen,
+
+# Mover el foco con SUPER + flechas
+bind = $mainMod, left, movefocus, l
+bind = $mainMod, right, movefocus, r
+bind = $mainMod, up, movefocus, u
+bind = $mainMod, down, movefocus, d
+
+# Cambiar de espacio de trabajo con SUPER + [1-9]
+bind = $mainMod, 1, workspace, 1
+bind = $mainMod, 2, workspace, 2
+bind = $mainMod, 3, workspace, 3
+bind = $mainMod, 4, workspace, 4
+bind = $mainMod, 5, workspace, 5
+
+# Mover ventana activa al espacio de trabajo con SUPER + SHIFT + [1-9]
+bind = $mainMod SHIFT, 1, movetoworkspace, 1
+bind = $mainMod SHIFT, 2, movetoworkspace, 2
+bind = $mainMod SHIFT, 3, movetoworkspace, 3
+bind = $mainMod SHIFT, 4, movetoworkspace, 4
+bind = $mainMod SHIFT, 5, movetoworkspace, 5
+
+# Control de volumen y brillo
+bind = , XF86AudioRaiseVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
+bind = , XF86AudioLowerVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+bind = , XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+EOF
+
+# ==============================================================================
+# 4. CONFIGURACIÓN DE WAYBAR
+# ==============================================================================
+echo "${YELLOW}Generando configuración de Waybar...${RESET}"
+cat << 'EOF' > ~/.config/waybar/config
+{
+    "layer": "top",
+    "position": "top",
+    "height": 30,
+    "spacing": 4,
+    "modules-left": ["hyprland/workspaces"],
+    "modules-center": ["hyprland/window"],
+    "modules-right": ["pulseaudio", "network", "battery", "clock", "tray"],
+    
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "on-click": "activate"
+    },
+    "clock": {
+        "format": "  {:%H:%M}",
+        "format-alt": "  {:%A, %B %d, %Y}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>"
+    },
+    "battery": {
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon}  {capacity}%",
+        "format-charging": "  {capacity}%",
+        "format-plugged": "  {capacity}%",
+        "format-icons": ["", "", "", "", ""]
+    },
+    "network": {
+        "format-wifi": "  {essid}",
+        "format-ethernet": "  {ipaddr}",
+        "format-disconnected": "⚠  Desconectado"
+    },
+    "pulseaudio": {
+        "format": "{icon}  {volume}%",
+        "format-muted": "  Mute",
+        "format-icons": {
+            "default": ["", "", ""]
+        }
+    },
+    "tray": {
+        "spacing": 10
+    }
+}
+EOF
+
+cat << 'EOF' > ~/.config/waybar/style.css
+* {
+    font-family: "JetBrainsMono Nerd Font", "Font Awesome 6 Free";
+    font-size: 14px;
+    border: none;
+    border-radius: 0;
+}
+
+window#waybar {
+    background-color: rgba(30, 30, 46, 0.9);
+    color: #cdd6f4;
+    border-bottom: 2px solid rgba(203, 166, 247, 0.5);
+}
+
+#workspaces button {
+    padding: 0 10px;
+    color: #cdd6f4;
+    border-radius: 10px;
+    margin: 4px;
+}
+
+#workspaces button.active {
+    background-color: #cba6f7;
+    color: #11111b;
+}
+
+#clock, #battery, #network, #pulseaudio, #tray {
+    padding: 0 15px;
+    margin: 4px 4px;
+    border-radius: 10px;
+    background-color: #313244;
+    color: #cdd6f4;
+}
+
+#clock { color: #89b4fa; }
+#battery { color: #a6e3a1; }
+#network { color: #f38ba8; }
+#pulseaudio { color: #fab387; }
+EOF
+
+# ==============================================================================
+# 5. CONFIGURACIÓN DE KITTY (Terminal)
+# ==============================================================================
+echo "${YELLOW}Generando configuración de Kitty...${RESET}"
+cat << 'EOF' > ~/.config/kitty/kitty.conf
+font_family      JetBrainsMono Nerd Font
+bold_font        auto
+italic_font      auto
+bold_italic_font auto
+font_size 12.0
+
+window_padding_width 10
+background_opacity 0.85
+dynamic_background_opacity yes
+
+# Tema de colores (Catppuccin Mocha)
+foreground              #cdd6f4
+background              #1e1e2e
+selection_foreground    #1e1e2e
+selection_background    #f5e0dc
+cursor                  #f5e0dc
+cursor_text_color       #1e1e2e
+
+# Colores básicos
+color0 #45475a
+color8 #585b70
+color1 #f38ba8
+color9 #f38ba8
+color2 #a6e3a1
+color10 #a6e3a1
+color3 #f9e2af
+color11 #f9e2af
+color4 #89b4fa
+color12 #89b4fa
+color5 #f5c2e7
+color13 #f5c2e7
+color6 #94e2d5
+color14 #94e2d5
+color7 #bac2de
+color15 #a6adc8
+EOF
+
+# ==============================================================================
+# 6. CONFIGURACIÓN DE WOFI (Lanzador)
+# ==============================================================================
+echo "${YELLOW}Generando configuración de Wofi...${RESET}"
+cat << 'EOF' > ~/.config/wofi/style.css
+window {
+    margin: 0px;
+    border: 2px solid #cba6f7;
+    background-color: rgba(30, 30, 46, 0.95);
+    border-radius: 15px;
+    font-family: "JetBrainsMono Nerd Font";
+}
+
+#input {
+    margin: 10px;
+    border: none;
+    color: #cdd6f4;
+    background-color: #313244;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+#inner-box {
+    margin: 5px;
+    background-color: transparent;
+}
+
+#outer-box {
+    margin: 5px;
+    background-color: transparent;
+}
+
+#text {
+    margin: 5px;
+    color: #cdd6f4;
+}
+
+#entry:selected {
+    background-color: #cba6f7;
+    border-radius: 10px;
+}
+
+#entry:selected #text {
+    color: #1e1e2e;
+    font-weight: bold;
+}
+EOF
+
+# ==============================================================================
+# 7. CONFIGURACIÓN DEL FONDO (Hyprpaper)
+# ==============================================================================
+echo "${YELLOW}Generando configuración de Hyprpaper...${RESET}"
+# Descargamos un fondo genérico de prueba (puedes cambiarlo después)
+wget -qO ~/.config/hypr/wallpaper.jpg "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1920&auto=format&fit=crop" || touch ~/.config/hypr/wallpaper.jpg
+
+cat << 'EOF' > ~/.config/hypr/hyprpaper.conf
+preload = ~/.config/hypr/wallpaper.jpg
+wallpaper = ,~/.config/hypr/wallpaper.jpg
+splash = false
+EOF
+
+echo "${GREEN}====================================================${RESET}"
+echo "${GREEN} ¡Configuración completada con éxito!${RESET}"
+echo "${GREEN}====================================================${RESET}"
+echo ""
+echo "Para iniciar el entorno, simplemente escribe desde tu TTY:"
+echo "${BLUE}Hyprland${RESET}"
+echo ""
+echo "Atajos principales:"
+echo " - SUPER + Enter : Abrir Terminal (Kitty)"
+echo " - SUPER + Espacio: Abrir menú de aplicaciones (Wofi)"
+echo " - SUPER + Q : Cerrar la ventana activa"
+echo " - SUPER + E : Abrir gestor de archivos (Thunar)"
+echo " - SUPER + SHIFT + M : Salir de Hyprland"
+
